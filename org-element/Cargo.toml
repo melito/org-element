@@ -21,3 +21,6 @@ once_cell = { workspace = true }
 [features]
 default = ["serde"]
 serde = ["dep:serde", "dep:serde_json"]
+# Emacs `org-element.el` compatible API surface (function names mirroring the
+# Elisp API). Pure Rust over the core types; no extra dependencies.
+compat = []

@@ -39,6 +39,8 @@
 #![warn(rustdoc::broken_intra_doc_links)]
 
 pub mod ast;
+#[cfg(feature = "compat")]
+pub mod compat;
 pub mod error;
 pub mod export;
 pub mod parser;
