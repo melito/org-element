@@ -1,0 +1,23 @@
+[package]
+name = "org-element"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "AST types and a tree-sitter-backed parser for Org mode documents, compatible with Emacs org-element"
+readme = "README.md"
+
+[dependencies]
+tree-sitter = { workspace = true }
+tree-sitter-org = { workspace = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+thiserror = { workspace = true }
+once_cell = { workspace = true }
+
+[features]
+default = ["serde"]
+serde = ["dep:serde", "dep:serde_json"]
