@@ -9,14 +9,31 @@ keywords.workspace = true
 categories.workspace = true
 description = "AST types and a tree-sitter-backed parser for Org mode documents, compatible with Emacs org-element"
 readme = "README.md"
+build = "build.rs"
+# The grammar C sources are compiled by build.rs; make sure they ship in the
+# published package.
+include = [
+    "src/**/*.rs",
+    "build.rs",
+    "grammar/parser.c",
+    "grammar/scanner.c",
+    "grammar/tree_sitter/*.h",
+    "grammar/node-types.json",
+    "examples/**/*.rs",
+    "README.md",
+    "LICENSE-*",
+]
 
 [dependencies]
 tree-sitter = { workspace = true }
-tree-sitter-org = { workspace = true }
+tree-sitter-language = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
 once_cell = { workspace = true }
+
+[build-dependencies]
+cc = { workspace = true }
 
 [features]
 default = ["serde"]
@@ -24,3 +41,9 @@ serde = ["dep:serde", "dep:serde_json"]
 # Emacs `org-element.el` compatible API surface (function names mirroring the
 # Elisp API). Pure Rust over the core types; no extra dependencies.
 compat = []
+# Opt-in: best-effort auto-detection of a wasm-capable LLVM clang in build.rs
+# (probes Homebrew/PATH) when compiling for wasm32-unknown-unknown. Off by
+# default so a native build never probes for a wasm compiler; enable it for a
+# smoother `wasm32-unknown-unknown` build on macOS. You can always set
+# CC_wasm32_unknown_unknown yourself instead.
+wasm = []

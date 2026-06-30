@@ -4,8 +4,8 @@ use tree_sitter::Parser;
 
 fn main() {
     let mut parser = Parser::new();
-    let language = tree_sitter_org::language();
-    parser.set_language(language).unwrap();
+    let language = org_element::language();
+    parser.set_language(&language).unwrap();
 
     let source = r#"* TODO Test Headline :tag1:tag2:
   SCHEDULED: <2025-01-15 Wed>
@@ -55,7 +55,7 @@ fn print_tree(node: &tree_sitter::Node, source: &str, depth: usize) {
     let field_info = node.parent()
         .and_then(|parent| {
             for i in 0..parent.child_count() {
-                if let Some(child) = parent.child(i) {
+                if let Some(child) = parent.child(i as u32) {
                     if child.id() == node.id() {
                         if let Some(name) = parent.field_name_for_child(i as u32) {
                             return Some(format!(" [field: {}]", name));
@@ -78,7 +78,7 @@ fn print_tree(node: &tree_sitter::Node, source: &str, depth: usize) {
 
     // Print named children with their field names
     for i in 0..node.child_count() {
-        if let Some(child) = node.child(i) {
+        if let Some(child) = node.child(i as u32) {
             print_tree(&child, source, depth + 1);
         }
     }
