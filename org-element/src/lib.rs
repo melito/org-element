@@ -34,6 +34,28 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! ## Building for WebAssembly
+//!
+//! The org grammar is compiled from C, and `wasm32-unknown-unknown` has no
+//! libc. tree-sitter's bundled mini-sysroot is pulled in automatically, but a
+//! **clang with the WebAssembly backend** is still required — Apple's
+//! `/usr/bin/clang` does not have one (WebAssembly is LLVM-only; GCC cannot
+//! target it).
+//!
+//! If a wasm build fails with `unable to create target: 'No available targets
+//! are compatible with triple "wasm32-unknown-unknown"'`, install LLVM
+//! (`brew install llvm`) and add a `.cargo/config.toml` to *your* project:
+//!
+//! ```toml
+//! [env]
+//! CC_wasm32_unknown_unknown = "/opt/homebrew/opt/llvm/bin/clang"
+//! AR_wasm32_unknown_unknown = "/opt/homebrew/opt/llvm/bin/llvm-ar"
+//! ```
+//!
+//! This is required build-graph-wide (the upstream `tree-sitter` runtime crate
+//! also compiles C for wasm), so setting it on this crate alone is not enough.
+//! Most Linux/CI `clang` builds already include the wasm backend.
 
 #![warn(missing_docs)]
 #![warn(rustdoc::broken_intra_doc_links)]
@@ -51,5 +73,5 @@ pub mod traversal;
 pub use ast::{Element, Node, Object};
 pub use error::{Error, Result};
 pub use export::HtmlExporter;
-pub use parser::Parser;
+pub use parser::{language, Parser};
 pub use properties::Properties;

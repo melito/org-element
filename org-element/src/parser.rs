@@ -6,10 +6,28 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use tree_sitter::{Node as TSNode, Tree};
+use tree_sitter_language::LanguageFn;
 
 use crate::ast::{Element, Node, Object};
 use crate::error::{Error, Result};
 use crate::properties::StandardProperties;
+
+// The tree-sitter-org grammar is compiled directly into this crate by
+// `build.rs` (see `grammar/`). This is its generated entry point.
+unsafe extern "C" {
+    fn tree_sitter_org() -> *const ();
+}
+
+/// The bundled tree-sitter-org grammar as a [`LanguageFn`].
+const ORG_LANGUAGE: LanguageFn = unsafe { LanguageFn::from_raw(tree_sitter_org) };
+
+/// The bundled tree-sitter-org [`tree_sitter::Language`].
+///
+/// Exposed for advanced users who want to run their own tree-sitter queries
+/// against the Org grammar directly, without going through [`Parser`].
+pub fn language() -> tree_sitter::Language {
+    ORG_LANGUAGE.into()
+}
 
 /// Known TODO keywords (configurable in real implementation)
 const TODO_KEYWORDS: &[&str] = &["TODO", "DONE", "NEXT", "WAITING", "CANCELLED", "HOLD"];
@@ -48,9 +66,9 @@ impl Parser {
     /// Create a new parser.
     pub fn new() -> Result<Self> {
         let mut ts_parser = tree_sitter::Parser::new();
-        let language = tree_sitter_org::language();
+        let language: tree_sitter::Language = ORG_LANGUAGE.into();
         ts_parser
-            .set_language(language)
+            .set_language(&language)
             .map_err(|e| Error::TreeSitterError(e.to_string()))?;
         Ok(Self { ts_parser })
     }
@@ -697,7 +715,7 @@ impl Parser {
             let marker_kind = first_child.kind();
             // Find the last child that matches the opening marker kind
             for i in (1..child_count).rev() {
-                if let Some(child) = ts_node.child(i) {
+                if let Some(child) = ts_node.child(i as u32) {
                     if child.kind() == marker_kind {
                         let content_start = first_child.end_byte();
                         let content_end = child.start_byte();
