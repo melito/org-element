@@ -24,3 +24,9 @@ serde = ["dep:serde", "dep:serde_json"]
 # Emacs `org-element.el` compatible API surface (function names mirroring the
 # Elisp API). Pure Rust over the core types; no extra dependencies.
 compat = []
+
+[package.metadata.docs.rs]
+# Build docs.rs with every feature so `compat` (and `serde`) render on the
+# published docs page; docs.rs builds default-features-only otherwise.
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
