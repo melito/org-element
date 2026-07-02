@@ -57,6 +57,53 @@ pub fn parse_plist(s: &str) -> Vec<(String, String)> {
     result
 }
 
+/// Return the value of a `#+NAME:` affiliated keyword attached to a table whose
+/// byte range in `source` is `[begin, end)`, if any.
+///
+/// The tree-sitter-org grammar folds the `#+NAME:` line into the table node's
+/// own range rather than exposing it as a preceding sibling, so we scan the
+/// node's text up to its first `|` row (this mirrors the "within the block"
+/// branch of source-block handling). As a fallback — in case a grammar version
+/// places the keyword just outside the node — we also check the last non-blank
+/// line before `begin`. Returns the trimmed name, or `None`.
+fn affiliated_name_before(source: &str, begin: usize, end: usize) -> Option<String> {
+    // Primary: lines inside the node, before the first table row.
+    if let Some(text) = source.get(begin..end) {
+        for line in text.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with('|') {
+                break; // reached the table itself
+            }
+            if let Some(name) = name_keyword(trimmed) {
+                return Some(name);
+            }
+        }
+    }
+
+    // Fallback: the immediately-preceding non-blank line.
+    if let Some(before) = source.get(..begin) {
+        for line in before.lines().rev() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            return name_keyword(trimmed);
+        }
+    }
+    None
+}
+
+/// If `line` is a `#+NAME:` keyword with a non-empty value, return that value.
+fn name_keyword(line: &str) -> Option<String> {
+    if line.to_uppercase().starts_with("#+NAME:") {
+        let value = line["#+NAME:".len()..].trim();
+        if !value.is_empty() {
+            return Some(value.to_string());
+        }
+    }
+    None
+}
+
 /// Org mode parser using tree-sitter.
 pub struct Parser {
     ts_parser: tree_sitter::Parser,
@@ -960,6 +1007,17 @@ impl Parser {
             StandardProperties::new(ts_node.start_byte(), ts_node.end_byte()),
         )));
 
+        // Parse a `#+NAME:` affiliated keyword on the line immediately preceding
+        // the table (the grammar does not attach it to the table node). This
+        // mirrors the handling for source blocks so a named table can be
+        // referenced by name. Only the last non-blank line before the table is
+        // considered — an affiliated keyword must be directly adjacent.
+        if let Some(name) =
+            affiliated_name_before(source, ts_node.start_byte(), ts_node.end_byte())
+        {
+            table.borrow_mut().properties.set_string("name", &name);
+        }
+
         // First pass: find if there's an hr node to determine header rows
         let mut has_hr = false;
         let mut hr_index = usize::MAX;
@@ -1326,6 +1384,27 @@ mod tests {
     fn test_parser_creation() {
         let parser = Parser::new();
         assert!(parser.is_ok());
+    }
+
+    #[test]
+    fn test_table_name_affiliated_keyword() {
+        let mut parser = Parser::new().unwrap();
+        let src = "#+NAME: people\n| Name | Age |\n|------+-----|\n| Alice | 30 |\n\n\
+                   | Unnamed | X |\n|---------+---|\n| a | 1 |\n";
+        let ast = parser.parse(src).unwrap();
+
+        let tables = ast.find_elements(Element::Table);
+        assert_eq!(tables.len(), 2, "should find two tables");
+        assert_eq!(
+            tables[0].borrow().properties.get_string("name"),
+            Some("people"),
+            "first table takes its #+NAME:"
+        );
+        assert_eq!(
+            tables[1].borrow().properties.get_string("name"),
+            None,
+            "unnamed table has no name"
+        );
     }
 
     #[test]
