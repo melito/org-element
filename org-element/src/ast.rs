@@ -6,9 +6,9 @@
 pub mod elements;
 pub mod objects;
 
+use std::cell::RefCell;
 use std::fmt;
 use std::rc::{Rc, Weak};
-use std::cell::RefCell;
 
 use crate::properties::{Properties, StandardProperties};
 

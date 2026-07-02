@@ -117,10 +117,7 @@ static OBJECT_RESTRICTIONS: Lazy<HashMap<&'static str, ObjectSet>> = Lazy::new(|
     map.insert("underline", standard.clone());
 
     // Citation can only contain citation-reference
-    map.insert(
-        "citation",
-        HashSet::from([Object::CitationReference]),
-    );
+    map.insert("citation", HashSet::from([Object::CitationReference]));
 
     map
 });
@@ -198,8 +195,14 @@ mod tests {
 
     #[test]
     fn test_is_allowed_functions() {
-        assert!(is_object_allowed_in_element(Object::Bold, Element::Paragraph));
-        assert!(!is_object_allowed_in_element(Object::LineBreak, Element::Headline));
+        assert!(is_object_allowed_in_element(
+            Object::Bold,
+            Element::Paragraph
+        ));
+        assert!(!is_object_allowed_in_element(
+            Object::LineBreak,
+            Element::Headline
+        ));
         assert!(!is_object_allowed_in_object(Object::Link, Object::Link));
     }
 }

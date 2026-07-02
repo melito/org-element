@@ -92,7 +92,9 @@ impl HtmlExporter {
         if self.include_wrapper {
             output.push_str("<!DOCTYPE html>\n<html>\n<head>\n");
             output.push_str("<meta charset=\"utf-8\">\n");
-            output.push_str("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
+            output.push_str(
+                "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n",
+            );
             output.push_str("</head>\n<body>\n");
         }
 
@@ -189,7 +191,8 @@ impl HtmlExporter {
                 {
                     let mut attrs = HashMap::new();
                     for key in &["width", "height", "class", "style"] {
-                        if let Some(val) = node.properties.get_string(&format!("attr-html-{}", key)) {
+                        if let Some(val) = node.properties.get_string(&format!("attr-html-{}", key))
+                        {
                             attrs.insert(key.to_string(), val.to_string());
                         }
                     }
@@ -231,7 +234,9 @@ impl HtmlExporter {
                         let rel_end = child_end.saturating_sub(para_begin);
                         // Emit plain text before this child
                         if rel_begin > last_pos && rel_begin <= raw.len() {
-                            output.push_str(&escape_html(&unescape_org_markup(&raw[last_pos..rel_begin])));
+                            output.push_str(&escape_html(&unescape_org_markup(
+                                &raw[last_pos..rel_begin],
+                            )));
                         }
                         drop(child_borrowed);
                         self.export_node(child, output, depth + 1)?;
@@ -499,8 +504,12 @@ impl HtmlExporter {
                 output.push_str("</div>\n");
             }
 
-            Element::Clock | Element::DiarySexp | Element::SpecialBlock |
-            Element::BabelCall | Element::Inlinetask | Element::DynamicBlock => {
+            Element::Clock
+            | Element::DiarySexp
+            | Element::SpecialBlock
+            | Element::BabelCall
+            | Element::Inlinetask
+            | Element::DynamicBlock => {
                 // These elements are either not commonly rendered or need special handling
                 self.export_children(node, output, depth)?;
             }
@@ -510,7 +519,12 @@ impl HtmlExporter {
     }
 
     /// Export a headline element.
-    fn export_headline(&self, node: &Node, output: &mut String, depth: usize) -> Result<(), ExportError> {
+    fn export_headline(
+        &self,
+        node: &Node,
+        output: &mut String,
+        depth: usize,
+    ) -> Result<(), ExportError> {
         let level = node.properties.get_integer("level").unwrap_or(1) as usize;
         let h_level = level.min(6); // HTML only has h1-h6
 
@@ -522,7 +536,11 @@ impl HtmlExporter {
         }
 
         if let Some(priority) = node.properties.get_string("priority") {
-            classes.push(format!("{}priority-{}", self.class_prefix, priority.to_lowercase()));
+            classes.push(format!(
+                "{}priority-{}",
+                self.class_prefix,
+                priority.to_lowercase()
+            ));
         }
 
         // Opening tag with classes
@@ -720,14 +738,21 @@ impl HtmlExporter {
             .collect();
 
         // Check if preceding src block had :results html, then consume (clear) it
-        let results_type = self.last_src_results.borrow_mut().take().unwrap_or_default();
+        let results_type = self
+            .last_src_results
+            .borrow_mut()
+            .take()
+            .unwrap_or_default();
         let is_html = results_type.contains("html");
         let is_table = results_type.contains("table");
         // Also auto-detect org table format: lines starting with "|"
-        let looks_like_org_table = stripped.iter().all(|l| l.starts_with('|') || l.trim().starts_with("|--"));
+        let looks_like_org_table = stripped
+            .iter()
+            .all(|l| l.starts_with('|') || l.trim().starts_with("|--"));
 
         if is_frameless {
-            output.push_str("<div class=\"org-results org-results-static org-results-frameless\">\n");
+            output
+                .push_str("<div class=\"org-results org-results-static org-results-frameless\">\n");
         } else {
             output.push_str("<div class=\"org-results org-results-static\">\n");
         }
@@ -775,7 +800,10 @@ impl HtmlExporter {
             for line in lines {
                 let trimmed = line.trim();
                 // Separator row: |---+---| or |---|
-                if trimmed.starts_with("|") && trimmed.contains("---") && !trimmed.contains(|c: char| c.is_alphanumeric()) {
+                if trimmed.starts_with("|")
+                    && trimmed.contains("---")
+                    && !trimmed.contains(|c: char| c.is_alphanumeric())
+                {
                     past_separator = true;
                     continue;
                 }
@@ -795,7 +823,11 @@ impl HtmlExporter {
             }
         } else {
             // TSV/CSV fallback: detect separator (tab preferred, then comma)
-            let sep = if lines.iter().any(|l| l.contains('\t')) { '\t' } else { ',' };
+            let sep = if lines.iter().any(|l| l.contains('\t')) {
+                '\t'
+            } else {
+                ','
+            };
             for line in lines {
                 let trimmed = line.trim();
                 if trimmed.is_empty() {
@@ -827,7 +859,11 @@ impl HtmlExporter {
         }
 
         // If no separator was found, all rows go into tbody
-        let tbody_rows = if past_separator { &body_rows } else { &header_rows };
+        let tbody_rows = if past_separator {
+            &body_rows
+        } else {
+            &header_rows
+        };
         if !tbody_rows.is_empty() {
             output.push_str("<tbody>\n");
             for row in tbody_rows {
@@ -846,7 +882,12 @@ impl HtmlExporter {
     }
 
     /// Export an object node.
-    fn export_object(&self, node: &Node, object: &Object, output: &mut String) -> Result<(), ExportError> {
+    fn export_object(
+        &self,
+        node: &Node,
+        object: &Object,
+        output: &mut String,
+    ) -> Result<(), ExportError> {
         match object {
             Object::Bold => {
                 output.push_str("<strong>");
@@ -917,7 +958,10 @@ impl HtmlExporter {
                     node.properties.get_integer("month-start"),
                     node.properties.get_integer("day-start"),
                 ) {
-                    output.push_str(&format!(" datetime=\"{:04}-{:02}-{:02}\"", year, month, day));
+                    output.push_str(&format!(
+                        " datetime=\"{:04}-{:02}-{:02}\"",
+                        year, month, day
+                    ));
                 }
 
                 output.push_str(">");
@@ -1069,7 +1113,7 @@ impl HtmlExporter {
                 Some("url") => path.to_string(),
                 Some("file") => {
                     if path.ends_with(".org") {
-                        format!("{}.html", &path[..path.len()-4])
+                        format!("{}.html", &path[..path.len() - 4])
                     } else {
                         path.to_string()
                     }
@@ -1124,7 +1168,12 @@ impl HtmlExporter {
     }
 
     /// Export all children of a node.
-    fn export_children(&self, node: &Node, output: &mut String, depth: usize) -> Result<(), ExportError> {
+    fn export_children(
+        &self,
+        node: &Node,
+        output: &mut String,
+        depth: usize,
+    ) -> Result<(), ExportError> {
         for child in &node.children {
             self.export_node(child, output, depth + 1)?;
         }
@@ -1135,7 +1184,9 @@ impl HtmlExporter {
 /// Extract the `#+TITLE:` value from a parsed AST, if present.
 pub fn extract_title(ast: &Rc<RefCell<Node>>) -> Option<String> {
     let node = ast.borrow();
-    node.properties.get_string("doc-title").map(|s| s.to_string())
+    node.properties
+        .get_string("doc-title")
+        .map(|s| s.to_string())
 }
 
 /// Errors that can occur during export.
@@ -1192,7 +1243,11 @@ fn is_image_url(path: &str) -> bool {
     }
     let clean = path.split(['?', '#']).next().unwrap_or(path);
     matches!(
-        clean.rsplit('.').next().map(|e| e.to_ascii_lowercase()).as_deref(),
+        clean
+            .rsplit('.')
+            .next()
+            .map(|e| e.to_ascii_lowercase())
+            .as_deref(),
         Some("png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" | "avif")
     )
 }
@@ -1230,7 +1285,6 @@ fn escape_html(s: &str) -> String {
 mod tests {
     use super::*;
     use crate::Parser;
-
 
     #[test]
     fn test_export_simple_headline() {
@@ -1272,7 +1326,9 @@ mod tests {
     fn test_export_src_block() {
         let mut parser = Parser::new().unwrap();
         // Src blocks may need context to parse properly in tree-sitter-org
-        let ast = parser.parse("* Test\n\n#+BEGIN_SRC rust\nfn main() {}\n#+END_SRC").unwrap();
+        let ast = parser
+            .parse("* Test\n\n#+BEGIN_SRC rust\nfn main() {}\n#+END_SRC")
+            .unwrap();
 
         let exporter = HtmlExporter::new();
         let html = exporter.export(&ast).unwrap();
@@ -1348,12 +1404,24 @@ mod tests {
         let html = exporter.export(&ast).unwrap();
         println!("Checkbox list HTML:\n{}", html);
 
-        assert!(html.contains("<input type=\"checkbox\""), "Should have checkbox input");
-        assert!(html.contains("data-checkbox-offset="), "Should have offset attribute");
+        assert!(
+            html.contains("<input type=\"checkbox\""),
+            "Should have checkbox input"
+        );
+        assert!(
+            html.contains("data-checkbox-offset="),
+            "Should have offset attribute"
+        );
         assert!(!html.contains("disabled"), "Should not be disabled");
         // Text should render inline with checkbox, not inside <p> tags
-        assert!(!html.contains("<p>Buy milk"), "Paragraph should be inline, not wrapped in <p>");
-        assert!(html.contains("> Buy milk"), "Text should follow checkbox inline");
+        assert!(
+            !html.contains("<p>Buy milk"),
+            "Paragraph should be inline, not wrapped in <p>"
+        );
+        assert!(
+            html.contains("> Buy milk"),
+            "Text should follow checkbox inline"
+        );
     }
 
     #[test]
@@ -1365,8 +1433,14 @@ mod tests {
         let html = exporter.export(&ast).unwrap();
         println!("Standalone checkbox HTML:\n{}", html);
 
-        assert!(html.contains("<input type=\"checkbox\""), "Should render checkbox");
-        assert!(html.contains("data-checkbox-offset="), "Should have offset attribute");
+        assert!(
+            html.contains("<input type=\"checkbox\""),
+            "Should render checkbox"
+        );
+        assert!(
+            html.contains("data-checkbox-offset="),
+            "Should have offset attribute"
+        );
         assert!(html.contains("standalone task"), "Should have task text");
         assert!(!html.contains("[ ]"), "Should not have literal [ ] text");
     }
@@ -1381,7 +1455,10 @@ mod tests {
         let html = exporter.export(&ast).unwrap();
         println!("Non-checkbox brackets HTML:\n{}", html);
 
-        assert!(!html.contains("<input type=\"checkbox\""), "Mid-text [x] should not become checkbox");
+        assert!(
+            !html.contains("<input type=\"checkbox\""),
+            "Mid-text [x] should not become checkbox"
+        );
         assert!(html.contains("[x]"), "Should keep literal [x] text");
     }
 
@@ -1406,7 +1483,8 @@ mod tests {
 
         assert!(
             html.contains(r#"<a href="https://orgmode.org">org-mode</a>"#),
-            "First link should render correctly, got: {}", html
+            "First link should render correctly, got: {}",
+            html
         );
         assert!(
             html.contains(r#"<a href="https://orgmode.org/manual/Working-with-Source-Code.html">working with source code</a>"#),
@@ -1414,7 +1492,8 @@ mod tests {
         );
         assert!(
             html.contains(" allows "),
-            "Plain text between links should be preserved, got: {}", html
+            "Plain text between links should be preserved, got: {}",
+            html
         );
     }
 
@@ -1532,29 +1611,35 @@ mod tests {
 
         assert!(
             html.contains("<img src=\"https://example.com/photo.png\""),
-            "Image URL should render as <img>, got: {}", html
+            "Image URL should render as <img>, got: {}",
+            html
         );
         assert!(
             html.contains("alt=\"photo.png\""),
-            "Alt should be filename, got: {}", html
+            "Alt should be filename, got: {}",
+            html
         );
         assert!(
             !html.contains("<a "),
-            "Should NOT have <a> tag for image links, got: {}", html
+            "Should NOT have <a> tag for image links, got: {}",
+            html
         );
     }
 
     #[test]
     fn test_export_image_link_with_description() {
         let mut parser = Parser::new().unwrap();
-        let ast = parser.parse("[[https://example.com/photo.png][My photo]]").unwrap();
+        let ast = parser
+            .parse("[[https://example.com/photo.png][My photo]]")
+            .unwrap();
 
         let exporter = HtmlExporter::new();
         let html = exporter.export(&ast).unwrap();
 
         assert!(
             html.contains("<a href=\"https://example.com/photo.png\">My photo</a>"),
-            "Image link with description should render as <a>, got: {}", html
+            "Image link with description should render as <a>, got: {}",
+            html
         );
     }
 
@@ -1568,11 +1653,13 @@ mod tests {
 
         assert!(
             html.contains("<a href="),
-            "Non-image URL should render as <a>, got: {}", html
+            "Non-image URL should render as <a>, got: {}",
+            html
         );
         assert!(
             !html.contains("<img"),
-            "Non-image URL should NOT render as <img>, got: {}", html
+            "Non-image URL should NOT render as <img>, got: {}",
+            html
         );
     }
 
@@ -1586,21 +1673,25 @@ mod tests {
 
         assert!(
             html.contains("<img"),
-            "Uppercase image extension should render as <img>, got: {}", html
+            "Uppercase image extension should render as <img>, got: {}",
+            html
         );
     }
 
     #[test]
     fn test_export_image_link_with_query_string() {
         let mut parser = Parser::new().unwrap();
-        let ast = parser.parse("[[https://example.com/photo.png?w=300&h=200]]").unwrap();
+        let ast = parser
+            .parse("[[https://example.com/photo.png?w=300&h=200]]")
+            .unwrap();
 
         let exporter = HtmlExporter::new();
         let html = exporter.export(&ast).unwrap();
 
         assert!(
             html.contains("<img"),
-            "Image URL with query string should render as <img>, got: {}", html
+            "Image URL with query string should render as <img>, got: {}",
+            html
         );
     }
 
@@ -1619,7 +1710,9 @@ mod tests {
         assert!(!is_image_url("https://example.com/doc.pdf"));
         assert!(!is_image_url("https://example.com/"));
         // Media proxy URLs
-        assert!(is_image_url("/api/media/e5ead099-0b42-43eb-b383-577d91e38360"));
+        assert!(is_image_url(
+            "/api/media/e5ead099-0b42-43eb-b383-577d91e38360"
+        ));
         assert!(!is_image_url("/api/documents/123"));
     }
 
@@ -1632,7 +1725,10 @@ mod tests {
         let html = exporter.export(&ast).unwrap();
 
         assert!(html.contains("<table"), "Should have table tag");
-        assert!(!html.contains("<thead>"), "Should not have thead without hr separator");
+        assert!(
+            !html.contains("<thead>"),
+            "Should not have thead without hr separator"
+        );
         assert!(html.contains("<tbody>"), "Should have tbody");
         assert!(html.contains("<td>a</td>"), "All cells should be td");
         assert!(!html.contains("<th>"), "No th without header separator");
@@ -1664,9 +1760,7 @@ mod tests {
     #[test]
     fn test_export_image_without_attr_html() {
         let mut parser = Parser::new().unwrap();
-        let ast = parser
-            .parse("* Test\n\n[[./photo.jpg]]\n")
-            .unwrap();
+        let ast = parser.parse("* Test\n\n[[./photo.jpg]]\n").unwrap();
 
         let exporter = HtmlExporter::new();
         let html = exporter.export(&ast).unwrap();
@@ -1693,9 +1787,21 @@ mod tests {
         let exporter = HtmlExporter::new();
         let html = exporter.export(&ast).unwrap();
 
-        assert!(html.contains("width=\"400px\""), "Should have width, got: {}", html);
-        assert!(html.contains("height=\"200px\""), "Should have height, got: {}", html);
-        assert!(html.contains("class=\"rounded\""), "Should have class, got: {}", html);
+        assert!(
+            html.contains("width=\"400px\""),
+            "Should have width, got: {}",
+            html
+        );
+        assert!(
+            html.contains("height=\"200px\""),
+            "Should have height, got: {}",
+            html
+        );
+        assert!(
+            html.contains("class=\"rounded\""),
+            "Should have class, got: {}",
+            html
+        );
     }
 
     #[test]
@@ -1790,7 +1896,8 @@ mod tests {
         let html = exporter.export(&ast).unwrap();
         assert!(
             !html.contains("org-src-container"),
-            ":exports none should produce no src block output, got: {}", html
+            ":exports none should produce no src block output, got: {}",
+            html
         );
     }
 
@@ -1804,11 +1911,13 @@ mod tests {
         let html = exporter.export(&ast).unwrap();
         assert!(
             !html.contains("org-src-container"),
-            ":exports results should not render src container, got: {}", html
+            ":exports results should not render src container, got: {}",
+            html
         );
         assert!(
             !html.contains("<code"),
-            ":exports results should hide code block, got: {}", html
+            ":exports results should hide code block, got: {}",
+            html
         );
     }
 
@@ -1822,11 +1931,13 @@ mod tests {
         let html = exporter.export(&ast).unwrap();
         assert!(
             html.contains("<code"),
-            ":exports code should show code, got: {}", html
+            ":exports code should show code, got: {}",
+            html
         );
         assert!(
             !html.contains("org-results"),
-            ":exports code should hide results div, got: {}", html
+            ":exports code should hide results div, got: {}",
+            html
         );
     }
 
@@ -1840,7 +1951,8 @@ mod tests {
         let html = exporter.export(&ast).unwrap();
         assert!(
             html.contains("data-results=\"output html\""),
-            "Should have data-results attribute, got: {}", html
+            "Should have data-results attribute, got: {}",
+            html
         );
     }
 
@@ -1854,7 +1966,8 @@ mod tests {
         let html = exporter.export(&ast).unwrap();
         assert!(
             html.contains("data-block-name=\"my-block\""),
-            "Should have data-block-name attribute, got: {}", html
+            "Should have data-block-name attribute, got: {}",
+            html
         );
     }
 
@@ -1868,7 +1981,8 @@ mod tests {
         let html = exporter.export(&ast).unwrap();
         assert!(
             html.contains("data-var=\"x=data\""),
-            "Should have data-var attribute, got: {}", html
+            "Should have data-var attribute, got: {}",
+            html
         );
     }
 
@@ -1882,11 +1996,13 @@ mod tests {
         let html = exporter.export(&ast).unwrap();
         assert!(
             html.contains("org-result-html"),
-            "HTML results should use org-result-html class, got: {}", html
+            "HTML results should use org-result-html class, got: {}",
+            html
         );
         assert!(
             html.contains("<b>hi</b>"),
-            "HTML results should render raw HTML, got: {}", html
+            "HTML results should render raw HTML, got: {}",
+            html
         );
     }
 
@@ -1900,15 +2016,18 @@ mod tests {
         let html = exporter.export(&ast).unwrap();
         assert!(
             html.contains("<table class=\"org-table\">"),
-            "Pipe-delimited results should render as org table, got: {}", html
+            "Pipe-delimited results should render as org table, got: {}",
+            html
         );
         assert!(
             html.contains("<td>total</td>"),
-            "Should contain table cells, got: {}", html
+            "Should contain table cells, got: {}",
+            html
         );
         assert!(
             html.contains("<td>Cargo.toml</td>"),
-            "Should contain filename cell, got: {}", html
+            "Should contain filename cell, got: {}",
+            html
         );
     }
 
@@ -1922,15 +2041,18 @@ mod tests {
         let html = exporter.export(&ast).unwrap();
         assert!(
             html.contains("<thead>"),
-            "Should have thead for header row, got: {}", html
+            "Should have thead for header row, got: {}",
+            html
         );
         assert!(
             html.contains("<th>Name</th>"),
-            "Header cells should use <th>, got: {}", html
+            "Header cells should use <th>, got: {}",
+            html
         );
         assert!(
             html.contains("<td>Alice</td>"),
-            "Body cells should use <td>, got: {}", html
+            "Body cells should use <td>, got: {}",
+            html
         );
     }
 
@@ -1946,11 +2068,13 @@ mod tests {
         if html.contains("org-src-container") {
             assert!(
                 html.contains("<code"),
-                "Should show code block, got: {}", html
+                "Should show code block, got: {}",
+                html
             );
             assert!(
                 !html.contains("org-results-static"),
-                ":exports code should hide static results, got: {}", html
+                ":exports code should hide static results, got: {}",
+                html
             );
         }
     }
@@ -1966,7 +2090,8 @@ mod tests {
 
         assert!(
             !html.contains("org-results-static"),
-            ":exports none should hide static results, got: {}", html
+            ":exports none should hide static results, got: {}",
+            html
         );
     }
 
@@ -1982,7 +2107,8 @@ mod tests {
         if html.contains("org-src-container") || html.contains("org-results-static") {
             assert!(
                 html.contains("org-results-static"),
-                ":exports results should show static results, got: {}", html
+                ":exports results should show static results, got: {}",
+                html
             );
         }
     }
@@ -1996,19 +2122,23 @@ mod tests {
 
         assert!(
             output.contains("<table"),
-            "Should produce a table, got: {}", output
+            "Should produce a table, got: {}",
+            output
         );
         assert!(
             output.contains("<th>Name</th>"),
-            "First row should be header, got: {}", output
+            "First row should be header, got: {}",
+            output
         );
         assert!(
             output.contains("<td>Alice</td>"),
-            "Body cells should render, got: {}", output
+            "Body cells should render, got: {}",
+            output
         );
         assert!(
             output.contains("<td>SF</td>"),
-            "All cells should render, got: {}", output
+            "All cells should render, got: {}",
+            output
         );
     }
 
@@ -2020,11 +2150,13 @@ mod tests {
 
         assert!(
             output.contains("<th>Name</th>"),
-            "CSV first row should be header, got: {}", output
+            "CSV first row should be header, got: {}",
+            output
         );
         assert!(
             output.contains("<td>Alice</td>"),
-            "CSV body should render, got: {}", output
+            "CSV body should render, got: {}",
+            output
         );
     }
 
@@ -2058,11 +2190,13 @@ mod tests {
 
         assert!(
             html.contains("[ 10, 20, 30 ]"),
-            "Should strip org escape backslashes from results, got: {}", html
+            "Should strip org escape backslashes from results, got: {}",
+            html
         );
         assert!(
             !html.contains("\\["),
-            "Should NOT contain backslash-bracket in results, got: {}", html
+            "Should NOT contain backslash-bracket in results, got: {}",
+            html
         );
     }
 
@@ -2078,11 +2212,13 @@ mod tests {
 
         assert!(
             html.contains("*asterisk*"),
-            "Fixed-width should strip org escapes, got: {}", html
+            "Fixed-width should strip org escapes, got: {}",
+            html
         );
         assert!(
             html.contains("[bracket]"),
-            "Fixed-width should strip bracket escapes, got: {}", html
+            "Fixed-width should strip bracket escapes, got: {}",
+            html
         );
     }
 }

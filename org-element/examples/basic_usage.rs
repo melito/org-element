@@ -2,8 +2,8 @@
 //!
 //! This demonstrates parsing Org documents and extracting real properties.
 
-use org_element::{Parser, Element, Object};
 use org_element::traversal::NodeExt;
+use org_element::{Element, Object, Parser};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Sample Org document

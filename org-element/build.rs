@@ -170,9 +170,7 @@ fn compiler_has_wasm(clang: &std::path::Path) -> bool {
     std::process::Command::new(clang)
         .arg("--print-targets")
         .output()
-        .map(|out| {
-            out.status.success() && String::from_utf8_lossy(&out.stdout).contains("wasm32")
-        })
+        .map(|out| out.status.success() && String::from_utf8_lossy(&out.stdout).contains("wasm32"))
         .unwrap_or(false)
 }
 

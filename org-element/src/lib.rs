@@ -73,5 +73,5 @@ pub mod traversal;
 pub use ast::{Element, Node, Object};
 pub use error::{Error, Result};
 pub use export::HtmlExporter;
-pub use parser::{language, Parser};
+pub use parser::{Parser, language};
 pub use properties::Properties;

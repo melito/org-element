@@ -46,13 +46,21 @@ fn print_tree(node: &tree_sitter::Node, source: &str, depth: usize) {
     let text_preview = if node.child_count() == 0 {
         let text = &source[start..end.min(start + 40)];
         let text = text.replace('\n', "↵").replace('\t', "→");
-        format!(" \"{}\"", if text.len() > 37 { format!("{}...", &text[..37]) } else { text })
+        format!(
+            " \"{}\"",
+            if text.len() > 37 {
+                format!("{}...", &text[..37])
+            } else {
+                text
+            }
+        )
     } else {
         String::new()
     };
 
     // Get field name if this node is a field
-    let field_info = node.parent()
+    let field_info = node
+        .parent()
         .and_then(|parent| {
             for i in 0..parent.child_count() {
                 if let Some(child) = parent.child(i as u32) {
@@ -67,7 +75,8 @@ fn print_tree(node: &tree_sitter::Node, source: &str, depth: usize) {
         })
         .unwrap_or_default();
 
-    println!("{}{} ({}..{}){}{}",
+    println!(
+        "{}{} ({}..{}){}{}",
         indent,
         node.kind(),
         start,

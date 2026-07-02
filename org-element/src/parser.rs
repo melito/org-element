@@ -306,9 +306,7 @@ impl Parser {
         // Parse tags
         if let Some(tag_list) = self.find_child_by_kind(ts_node, "tag_list") {
             let tags = self.extract_tags(&tag_list, source);
-            headline
-                .properties
-                .set_string_list("tags", tags);
+            headline.properties.set_string_list("tags", tags);
         }
 
         Ok(Some(Rc::new(RefCell::new(headline))))
@@ -532,11 +530,16 @@ impl Parser {
                                     }
                                     _ => {}
                                 }
-                                if !dcursor.goto_next_sibling() { break; }
+                                if !dcursor.goto_next_sibling() {
+                                    break;
+                                }
                             }
                         }
                         if name.eq_ignore_ascii_case("TITLE") {
-                            parent.borrow_mut().properties.set_string("doc-title", &value);
+                            parent
+                                .borrow_mut()
+                                .properties
+                                .set_string("doc-title", &value);
                         }
                     }
                     _ => {}
@@ -587,7 +590,9 @@ impl Parser {
                                     }
                                     _ => {}
                                 }
-                                if !dcursor.goto_next_sibling() { break; }
+                                if !dcursor.goto_next_sibling() {
+                                    break;
+                                }
                             }
                         }
                         if name.eq_ignore_ascii_case("ATTR_HTML") {
@@ -598,7 +603,9 @@ impl Parser {
                     } else {
                         break;
                     }
-                    if !cursor.goto_next_sibling() { break; }
+                    if !cursor.goto_next_sibling() {
+                        break;
+                    }
                 }
             }
         }
@@ -606,12 +613,16 @@ impl Parser {
         // Use content_start so raw-value excludes directive lines
         let text = source[content_start..end].to_string();
 
-        let mut para = Node::element(Element::Paragraph, StandardProperties::new(content_start, end));
+        let mut para = Node::element(
+            Element::Paragraph,
+            StandardProperties::new(content_start, end),
+        );
         para.properties.set_string("raw-value", &text);
 
         // Store any ATTR_HTML properties
         for (key, val) in &attr_html_props {
-            para.properties.set_string(&format!("attr-html-{}", key), val);
+            para.properties
+                .set_string(&format!("attr-html-{}", key), val);
         }
 
         let para = Rc::new(RefCell::new(para));
@@ -659,9 +670,9 @@ impl Parser {
                     let child_end = child.end_byte();
 
                     // Skip expr nodes that overlap with already-parsed link ranges
-                    let overlaps = exclude_ranges.iter().any(|&(rs, re)| {
-                        child_start < re && child_end > rs
-                    });
+                    let overlaps = exclude_ranges
+                        .iter()
+                        .any(|&(rs, re)| child_start < re && child_end > rs);
 
                     if !overlaps {
                         let objects = self.parse_expr_for_objects(&child, source)?;
@@ -694,43 +705,63 @@ impl Parser {
             // Check for markup markers — only if both open and close markers exist
             match marker {
                 "*" => {
-                    if let Some((content, begin, end)) = self.extract_markup_content(ts_node, source) {
-                        let mut bold = Node::object(Object::Bold, StandardProperties::new(begin, end));
+                    if let Some((content, begin, end)) =
+                        self.extract_markup_content(ts_node, source)
+                    {
+                        let mut bold =
+                            Node::object(Object::Bold, StandardProperties::new(begin, end));
                         bold.properties.set_string("content", &content);
                         return Ok(vec![Rc::new(RefCell::new(bold))]);
                     }
                 }
                 "/" => {
-                    if let Some((content, begin, end)) = self.extract_markup_content(ts_node, source) {
-                        let mut italic = Node::object(Object::Italic, StandardProperties::new(begin, end));
+                    if let Some((content, begin, end)) =
+                        self.extract_markup_content(ts_node, source)
+                    {
+                        let mut italic =
+                            Node::object(Object::Italic, StandardProperties::new(begin, end));
                         italic.properties.set_string("content", &content);
                         return Ok(vec![Rc::new(RefCell::new(italic))]);
                     }
                 }
                 "_" => {
-                    if let Some((content, begin, end)) = self.extract_markup_content(ts_node, source) {
-                        let mut underline = Node::object(Object::Underline, StandardProperties::new(begin, end));
+                    if let Some((content, begin, end)) =
+                        self.extract_markup_content(ts_node, source)
+                    {
+                        let mut underline =
+                            Node::object(Object::Underline, StandardProperties::new(begin, end));
                         underline.properties.set_string("content", &content);
                         return Ok(vec![Rc::new(RefCell::new(underline))]);
                     }
                 }
                 "+" => {
-                    if let Some((content, begin, end)) = self.extract_markup_content(ts_node, source) {
-                        let mut strike = Node::object(Object::StrikeThrough, StandardProperties::new(begin, end));
+                    if let Some((content, begin, end)) =
+                        self.extract_markup_content(ts_node, source)
+                    {
+                        let mut strike = Node::object(
+                            Object::StrikeThrough,
+                            StandardProperties::new(begin, end),
+                        );
                         strike.properties.set_string("content", &content);
                         return Ok(vec![Rc::new(RefCell::new(strike))]);
                     }
                 }
                 "~" => {
-                    if let Some((content, begin, end)) = self.extract_markup_content(ts_node, source) {
-                        let mut code = Node::object(Object::Code, StandardProperties::new(begin, end));
+                    if let Some((content, begin, end)) =
+                        self.extract_markup_content(ts_node, source)
+                    {
+                        let mut code =
+                            Node::object(Object::Code, StandardProperties::new(begin, end));
                         code.properties.set_string("value", &content);
                         return Ok(vec![Rc::new(RefCell::new(code))]);
                     }
                 }
                 "=" => {
-                    if let Some((content, begin, end)) = self.extract_markup_content(ts_node, source) {
-                        let mut verbatim = Node::object(Object::Verbatim, StandardProperties::new(begin, end));
+                    if let Some((content, begin, end)) =
+                        self.extract_markup_content(ts_node, source)
+                    {
+                        let mut verbatim =
+                            Node::object(Object::Verbatim, StandardProperties::new(begin, end));
                         verbatim.properties.set_string("value", &content);
                         return Ok(vec![Rc::new(RefCell::new(verbatim))]);
                     }
@@ -740,7 +771,11 @@ impl Parser {
                     // An expr node may contain multiple links, so parse them all.
                     let full_text = self.get_text(ts_node, source);
                     if full_text.starts_with("[[") {
-                        return self.parse_all_links_from_text(&full_text, ts_node, ts_node.start_byte());
+                        return self.parse_all_links_from_text(
+                            &full_text,
+                            ts_node,
+                            ts_node.start_byte(),
+                        );
                     }
                 }
                 _ => {}
@@ -755,7 +790,11 @@ impl Parser {
     /// byte range covers the full markup including markers (e.g. `=text=`),
     /// excluding any trailing characters the expr node may include.
     /// Returns `None` if no valid matching markers are found.
-    fn extract_markup_content(&self, ts_node: &TSNode, source: &str) -> Option<(String, usize, usize)> {
+    fn extract_markup_content(
+        &self,
+        ts_node: &TSNode,
+        source: &str,
+    ) -> Option<(String, usize, usize)> {
         let child_count = ts_node.child_count();
         if child_count >= 2 {
             let first_child = ts_node.child(0).unwrap();
@@ -817,10 +856,7 @@ impl Parser {
         let start_byte = ts_node.start_byte();
         let end_byte = start_byte + link_text.len();
 
-        let mut link = Node::object(
-            Object::Link,
-            StandardProperties::new(start_byte, end_byte),
-        );
+        let mut link = Node::object(Object::Link, StandardProperties::new(start_byte, end_byte));
 
         link.properties.set_string("raw-link", link_text);
 
@@ -904,9 +940,17 @@ impl Parser {
                 if child.kind() == "listitem" {
                     if let Some(bullet_node) = child.child_by_field_name("bullet") {
                         let bullet = self.get_text(&bullet_node, source);
-                        let list_type = if bullet.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                        let list_type = if bullet
+                            .chars()
+                            .next()
+                            .map(|c| c.is_ascii_digit())
+                            .unwrap_or(false)
+                        {
                             "ordered"
-                        } else if bullet.starts_with("-") || bullet.starts_with("+") || bullet.starts_with("*") {
+                        } else if bullet.starts_with("-")
+                            || bullet.starts_with("+")
+                            || bullet.starts_with("*")
+                        {
                             "unordered"
                         } else {
                             "descriptive"
@@ -965,7 +1009,10 @@ impl Parser {
                     item.properties.set_string("checkbox", "trans");
                 }
                 // Store the byte offset of the '[' character for frontend toggling
-                let bracket_offset = checkbox_text.find('[').map(|i| checkbox_node.start_byte() + i).unwrap_or(checkbox_node.start_byte());
+                let bracket_offset = checkbox_text
+                    .find('[')
+                    .map(|i| checkbox_node.start_byte() + i)
+                    .unwrap_or(checkbox_node.start_byte());
                 item.properties
                     .set_integer("checkbox-offset", bracket_offset as i64);
             }
@@ -1012,8 +1059,7 @@ impl Parser {
         // mirrors the handling for source blocks so a named table can be
         // referenced by name. Only the last non-blank line before the table is
         // considered — an affiliated keyword must be directly adjacent.
-        if let Some(name) =
-            affiliated_name_before(source, ts_node.start_byte(), ts_node.end_byte())
+        if let Some(name) = affiliated_name_before(source, ts_node.start_byte(), ts_node.end_byte())
         {
             table.borrow_mut().properties.set_string("name", &name);
         }
@@ -1175,8 +1221,7 @@ impl Parser {
 
         // If we only got language (no header args from parameter field), try
         // extracting header args from the raw #+BEGIN_SRC line in the source.
-        if element_type == Element::SrcBlock
-            && block.properties.get_string("parameters").is_none()
+        if element_type == Element::SrcBlock && block.properties.get_string("parameters").is_none()
         {
             let begin = ts_node.start_byte();
             let block_text = &source[begin..ts_node.end_byte()];
@@ -1255,7 +1300,9 @@ impl Parser {
                         j += 1;
                     }
                     if !values.is_empty() {
-                        block.properties.set_string("header-results", &values.join(" "));
+                        block
+                            .properties
+                            .set_string("header-results", &values.join(" "));
                     }
                     i = j;
                 }
@@ -1277,7 +1324,10 @@ impl Parser {
                 }
                 ":var" => {
                     if i + 1 < tokens.len() {
-                        let existing = block.properties.get_string("header-var").unwrap_or_default();
+                        let existing = block
+                            .properties
+                            .get_string("header-var")
+                            .unwrap_or_default();
                         let new_val = if existing.is_empty() {
                             tokens[i + 1].to_string()
                         } else {
@@ -1379,7 +1429,6 @@ mod tests {
     use crate::ast::NodeVariant;
     use crate::traversal::NodeExt;
 
-
     #[test]
     fn test_parser_creation() {
         let parser = Parser::new();
@@ -1417,11 +1466,11 @@ mod tests {
 
         let headline = headlines[0].borrow();
         assert_eq!(headline.properties.get_integer("level"), Some(1));
+        assert_eq!(headline.properties.get_string("todo-keyword"), Some("TODO"));
         assert_eq!(
-            headline.properties.get_string("todo-keyword"),
-            Some("TODO")
+            headline.properties.get_string("title"),
+            Some("Test Headline")
         );
-        assert_eq!(headline.properties.get_string("title"), Some("Test Headline"));
     }
 
     #[test]
@@ -1546,7 +1595,10 @@ mod tests {
         let blocks = ast.find_elements(Element::SrcBlock);
         assert!(!blocks.is_empty());
         let block = blocks[0].borrow();
-        assert_eq!(block.properties.get_string("header-results"), Some("output html"));
+        assert_eq!(
+            block.properties.get_string("header-results"),
+            Some("output html")
+        );
     }
 
     #[test]
@@ -1558,8 +1610,14 @@ mod tests {
         let blocks = ast.find_elements(Element::SrcBlock);
         assert!(!blocks.is_empty());
         let block = blocks[0].borrow();
-        assert_eq!(block.properties.get_string("header-exports"), Some("results"));
-        assert_eq!(block.properties.get_string("header-results"), Some("output"));
+        assert_eq!(
+            block.properties.get_string("header-exports"),
+            Some("results")
+        );
+        assert_eq!(
+            block.properties.get_string("header-results"),
+            Some("output")
+        );
     }
 
     #[test]
@@ -1571,7 +1629,10 @@ mod tests {
         let blocks = ast.find_elements(Element::SrcBlock);
         assert!(!blocks.is_empty());
         let block = blocks[0].borrow();
-        assert_eq!(block.properties.get_string("header-var"), Some("x=data,y=other"));
+        assert_eq!(
+            block.properties.get_string("header-var"),
+            Some("x=data,y=other")
+        );
     }
 
     #[test]
@@ -1606,10 +1667,7 @@ mod tests {
 
         // First row should be a header
         let first_row = rows[0].borrow();
-        assert_eq!(
-            first_row.properties.get_string("row-type"),
-            Some("header")
-        );
+        assert_eq!(first_row.properties.get_string("row-type"), Some("header"));
 
         // Check header cells
         let cells: Vec<_> = first_row
@@ -1618,8 +1676,14 @@ mod tests {
             .filter(|c| matches!(c.borrow().variant, NodeVariant::Object(Object::TableCell)))
             .collect();
         assert_eq!(cells.len(), 2, "Header row should have 2 cells");
-        assert_eq!(cells[0].borrow().properties.get_string("value"), Some("Name"));
-        assert_eq!(cells[0].borrow().properties.get_string("cell-type"), Some("header"));
+        assert_eq!(
+            cells[0].borrow().properties.get_string("value"),
+            Some("Name")
+        );
+        assert_eq!(
+            cells[0].borrow().properties.get_string("cell-type"),
+            Some("header")
+        );
 
         // Second data row
         let second_row = rows[1].borrow();
@@ -1664,10 +1728,13 @@ mod tests {
     #[test]
     fn test_parse_plist() {
         let pairs = super::parse_plist(":width 300px :class my-img");
-        assert_eq!(pairs, vec![
-            ("width".to_string(), "300px".to_string()),
-            ("class".to_string(), "my-img".to_string()),
-        ]);
+        assert_eq!(
+            pairs,
+            vec![
+                ("width".to_string(), "300px".to_string()),
+                ("class".to_string(), "my-img".to_string()),
+            ]
+        );
 
         // Key with no value
         let pairs = super::parse_plist(":width");
@@ -1717,5 +1784,4 @@ mod tests {
             "Root node should have doc-title property"
         );
     }
-
 }
