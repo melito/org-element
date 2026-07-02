@@ -1,5 +1,5 @@
 [workspace]
-members = ["org-element"]
+members = ["org-element", "wasm-link-test"]
 resolver = "2"
 
 [workspace.package]

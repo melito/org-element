@@ -7,10 +7,6 @@ fn main() {
 
     let mut c_config = cc::Build::new();
     c_config.include(grammar_dir);
-    c_config
-        .flag_if_supported("-Wno-unused-parameter")
-        .flag_if_supported("-Wno-unused-but-set-variable")
-        .flag_if_supported("-Wno-trigraphs");
 
     // On wasm32-unknown-* there is no libc. The `tree-sitter-language` crate
     // ships a mini sysroot and exposes its location via cargo `links` metadata
@@ -32,26 +28,52 @@ fn main() {
             std::env::var("DEP_TREE_SITTER_LANGUAGE_WASM_HEADERS"),
             std::env::var("DEP_TREE_SITTER_LANGUAGE_WASM_SRC"),
         ) {
+            // We need the sysroot *headers* so `scanner.c`/`parser.c` can find
+            // <stdlib.h> etc. We do NOT, by default, compile the sysroot
+            // *sources*: the upstream `tree-sitter` runtime crate (a direct
+            // dependency of this crate) already compiles the very same
+            // `tree-sitter-language` wasm shim and exports `__assert_fail`,
+            // `malloc`, `memcpy`, … Compiling our own copy too makes the wasm
+            // linker fail with `duplicate symbol: __assert_fail` whenever both
+            // rlibs are linked into one artifact (e.g. a Leptos hydrate bundle).
+            //
+            // The libc symbols therefore come from the tree-sitter runtime; we
+            // only borrow its headers. Set
+            // ORG_ELEMENT_COMPILE_WASM_SYSROOT=1 to compile the shim here
+            // anyway, for the rare standalone build that links the grammar
+            // without the tree-sitter runtime crate.
             c_config.include(&headers);
-            // Compile the bundled libc shim sources in a SEPARATE build with
-            // warnings suppressed: it is third-party sysroot code and newer
-            // clang promotes some of its warnings (e.g. incompatible-pointer-
-            // types) to hard errors that `-w` alone does not downgrade.
-            let src = std::path::Path::new(&wasm_src);
-            let mut sysroot = cc::Build::new();
-            sysroot
-                .include(&headers)
-                .warnings(false)
-                .flag_if_supported("-Wno-error=incompatible-pointer-types")
-                .flag_if_supported("-Wno-incompatible-pointer-types");
-            if let Some(clang) = wasm_clang_if_needed(&sysroot) {
-                sysroot.compiler(&clang);
+
+            // The shim's <assert.h> defines `__assert_fail` *in the header*
+            // (not `static`/`inline`), so every TU that includes it mints its
+            // own external copy. Our `scanner.c` includes it, which collides
+            // with the identical symbol the tree-sitter runtime already
+            // exports. Defining NDEBUG makes `assert()` expand to `((void)0)`
+            // and emits no `__assert_fail` from our objects at all.
+            c_config.define("NDEBUG", None);
+
+            if std::env::var_os("ORG_ELEMENT_COMPILE_WASM_SYSROOT").is_some() {
+                // Compile the bundled libc shim sources in a SEPARATE build with
+                // warnings suppressed: it is third-party sysroot code and newer
+                // clang promotes some of its warnings (e.g. incompatible-pointer-
+                // types) to hard errors that `-w` alone does not downgrade.
+                let src = std::path::Path::new(&wasm_src);
+                let mut sysroot = cc::Build::new();
+                sysroot
+                    .include(&headers)
+                    .warnings(false)
+                    .flag_if_supported("-Wno-error=incompatible-pointer-types")
+                    .flag_if_supported("-Wno-incompatible-pointer-types");
+                if let Some(clang) = wasm_clang_if_needed(&sysroot) {
+                    sysroot.compiler(&clang);
+                }
+                for f in ["stdlib.c", "stdio.c", "string.c"] {
+                    sysroot.file(src.join(f));
+                }
+                sysroot.compile("ts_wasm_sysroot");
             }
-            for f in ["stdlib.c", "stdio.c", "string.c"] {
-                sysroot.file(src.join(f));
-            }
-            sysroot.compile("ts_wasm_sysroot");
         }
+        println!("cargo:rerun-if-env-changed=ORG_ELEMENT_COMPILE_WASM_SYSROOT");
     }
 
     let parser_path = grammar_dir.join("parser.c");

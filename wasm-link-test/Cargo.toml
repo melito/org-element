@@ -1,0 +1,23 @@
+# Minimal wasm *link* smoke test.
+#
+# The duplicate-symbol bug (`duplicate symbol: __assert_fail`) only manifests
+# when org-element's rlib is linked into a FINAL wasm artifact alongside the
+# tree-sitter runtime rlib. `cargo check` and `cargo build --lib` only produce
+# an `.rlib` archive — no final link — so they cannot catch the regression.
+#
+# A `cdylib` forces `rust-lld` to merge both rlibs and resolve symbols, exactly
+# like a Leptos hydrate bundle does, without any browser or wasm-bindgen
+# machinery. If org-element ever re-introduces a duplicate libc symbol on
+# wasm32-unknown-unknown, building this crate for that target fails to link.
+[package]
+name = "wasm-link-test"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# `wasm` so the build script can auto-locate a wasm-capable clang in CI/dev.
+org-element = { path = "../org-element", features = ["wasm"] }
