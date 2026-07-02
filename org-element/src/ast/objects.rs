@@ -34,20 +34,20 @@ pub enum Object {
     Verbatim,
 
     // Links and references (some recursive)
-    /// Link ([[url][description]]).
+    /// Link (`[[url][description]]`).
     Link,
 
-    /// Footnote reference ([fn:1] or [fn:: inline definition]).
+    /// Footnote reference (`[fn:1]` or `[fn:: inline definition]`).
     FootnoteReference,
 
-    /// Radio target (<<<target>>>).
+    /// Radio target (`<<<target>>>`).
     RadioTarget,
 
-    /// Target (<<target>>).
+    /// Target (`<<target>>`).
     Target,
 
     // Citations (recursive)
-    /// Citation ([cite:@key]).
+    /// Citation (`[cite:@key]`).
     Citation,
 
     /// Citation reference (part of a citation).

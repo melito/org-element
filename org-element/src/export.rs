@@ -31,7 +31,7 @@ pub struct HtmlExporter {
     class_prefix: String,
     /// Use semantic HTML5 elements (article, section, etc.)
     semantic_html: bool,
-    /// When true, the next paragraph should emit inline (no <p> tags)
+    /// When true, the next paragraph should emit inline (no `<p>` tags)
     inline_paragraph: Cell<bool>,
     /// ATTR_HTML properties from the current paragraph, threaded to child link export
     current_attr_html: RefCell<Option<HashMap<String, String>>>,

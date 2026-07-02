@@ -34,7 +34,7 @@ pub enum Element {
     /// Dynamic block (#+BEGIN: ... #+END:).
     DynamicBlock,
 
-    /// Footnote definition ([fn:1] definition text).
+    /// Footnote definition (`[fn:1] definition text`).
     FootnoteDefinition,
 
     /// Inlinetask (* TODO Title (like headline but inline).
@@ -65,7 +65,7 @@ pub enum Element {
     /// Babel call (#+CALL: function()).
     BabelCall,
 
-    /// Clock entry (CLOCK: [timestamp]--[timestamp]).
+    /// Clock entry (`CLOCK: [timestamp]--[timestamp]`).
     Clock,
 
     /// Comment line (# comment).
