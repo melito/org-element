@@ -65,6 +65,7 @@ pub mod ast;
 pub mod compat;
 pub mod error;
 pub mod export;
+pub mod highlight;
 pub mod parser;
 pub mod properties;
 pub mod restrictions;
@@ -73,5 +74,11 @@ pub mod traversal;
 pub use ast::{Element, Node, Object};
 pub use error::{Error, Result};
 pub use export::HtmlExporter;
+pub use highlight::{Highlight, TsHighlighter};
 pub use parser::{Parser, language};
+
+/// Re-exported so consumers can name the tree type our single-parse API returns
+/// ([`Parser::parse_tree`], [`Parser::parse_tree_edited`]) without depending on
+/// `tree-sitter` directly.
+pub use tree_sitter::Tree;
 pub use properties::Properties;

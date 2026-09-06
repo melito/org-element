@@ -5,12 +5,66 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use tree_sitter::{Node as TSNode, Tree};
+use tree_sitter::{InputEdit, Node as TSNode, Point, Tree};
 use tree_sitter_language::LanguageFn;
 
 use crate::ast::{Element, Node, Object};
 use crate::error::{Error, Result};
 use crate::properties::StandardProperties;
+
+/// The zero-based (row, column-in-bytes) [`Point`] at byte offset `off` in `s`.
+///
+/// tree-sitter positions are byte columns within a line, so we count bytes since
+/// the last `\n`. `off` must land on a char boundary (our callers split on the
+/// common prefix/suffix of two `&str`s, so it always does).
+fn point_at(s: &str, off: usize) -> Point {
+    let before = &s.as_bytes()[..off];
+    let row = before.iter().filter(|&&b| b == b'\n').count();
+    let line_start = before.iter().rposition(|&b| b == b'\n').map_or(0, |i| i + 1);
+    Point::new(row, off - line_start)
+}
+
+/// Derive a single [`InputEdit`] describing the change from `old` to `new` as
+/// the region between their common prefix and common suffix.
+///
+/// This is exact when the change is one contiguous replaced/inserted/deleted
+/// span (the common case for keystrokes and paste). For scattered multi-region
+/// edits it produces one conservative enclosing edit — still correct input for
+/// tree-sitter (it just reuses fewer subtrees). Prefix/suffix are trimmed to
+/// UTF-8 char boundaries so all offsets are valid.
+fn single_region_edit(old: &str, new: &str) -> InputEdit {
+    let (ob, nb) = (old.as_bytes(), new.as_bytes());
+
+    // Longest common prefix, backed off to a char boundary in both strings.
+    let max_pre = ob.len().min(nb.len());
+    let mut start = (0..max_pre).take_while(|&i| ob[i] == nb[i]).count();
+    while start > 0 && (!old.is_char_boundary(start) || !new.is_char_boundary(start)) {
+        start -= 1;
+    }
+
+    // Longest common suffix that doesn't overlap the prefix, on a char boundary.
+    let max_suf = (ob.len() - start).min(nb.len() - start);
+    let mut suf = (0..max_suf)
+        .take_while(|&i| ob[ob.len() - 1 - i] == nb[nb.len() - 1 - i])
+        .count();
+    while suf > 0
+        && (!old.is_char_boundary(old.len() - suf) || !new.is_char_boundary(new.len() - suf))
+    {
+        suf -= 1;
+    }
+
+    let old_end = ob.len() - suf;
+    let new_end = nb.len() - suf;
+
+    InputEdit {
+        start_byte: start,
+        old_end_byte: old_end,
+        new_end_byte: new_end,
+        start_position: point_at(old, start),
+        old_end_position: point_at(old, old_end),
+        new_end_position: point_at(new, new_end),
+    }
+}
 
 // The tree-sitter-org grammar is compiled directly into this crate by
 // `build.rs` (see `grammar/`). This is its generated entry point.
@@ -122,14 +176,59 @@ impl Parser {
 
     /// Parse Org text into an AST.
     pub fn parse(&mut self, source: &str) -> Result<Rc<RefCell<Node>>> {
-        let tree = self
-            .ts_parser
-            .parse(source, None)
+        let tree = self.parse_tree(source, None)?;
+        self.tree_to_ast(&tree, source)
+    }
+
+    /// Parse Org `source` into a raw tree-sitter [`Tree`], optionally reusing
+    /// `old_tree` for an incremental reparse.
+    ///
+    /// This is the single-parse primitive: one `Tree` can drive *both* the AST
+    /// ([`ast_from_tree`](Self::ast_from_tree) → [`HtmlExporter`](crate::HtmlExporter))
+    /// and the highlight query
+    /// ([`TsHighlighter::highlight_tree`](crate::TsHighlighter::highlight_tree)),
+    /// so a caller never has to parse the same text twice.
+    pub fn parse_tree(&mut self, source: &str, old_tree: Option<&Tree>) -> Result<Tree> {
+        self.ts_parser
+            .parse(source, old_tree)
             .ok_or_else(|| Error::ParseError {
                 position: 0,
                 message: "Failed to parse document".to_string(),
-            })?;
-        self.tree_to_ast(&tree, source)
+            })
+    }
+
+    /// Incrementally reparse after an edit: given the previous [`Tree`], the
+    /// `old_source` it was parsed from, and the `new_source`, produce a new
+    /// [`Tree`] reusing the unchanged subtrees.
+    ///
+    /// tree-sitter's incremental parse needs the old tree told *where* the edit
+    /// happened ([`Tree::edit`]) before reparsing. We only have full old/new
+    /// text (an editor's `<textarea>` value), so we recover a single edited
+    /// region as the span between the common prefix and common suffix — exactly
+    /// the delta a "replace this range" edit produces — and feed that as one
+    /// [`InputEdit`]. If the texts are identical this is a no-op reparse.
+    ///
+    /// This is a drop-in for [`parse_tree`](Self::parse_tree) on the keystroke
+    /// path: cheaper than a full parse because unchanged subtrees are reused.
+    pub fn parse_tree_edited(
+        &mut self,
+        old_tree: &Tree,
+        old_source: &str,
+        new_source: &str,
+    ) -> Result<Tree> {
+        let edit = single_region_edit(old_source, new_source);
+        let mut edited = old_tree.clone();
+        edited.edit(&edit);
+        self.parse_tree(new_source, Some(&edited))
+    }
+
+    /// Build the org-element AST from an already-parsed [`Tree`].
+    ///
+    /// Pairs with [`parse_tree`](Self::parse_tree) for the single-parse path.
+    /// `source` must be the exact text `tree` was parsed from (byte offsets in
+    /// the tree index into it).
+    pub fn ast_from_tree(&self, tree: &Tree, source: &str) -> Result<Rc<RefCell<Node>>> {
+        self.tree_to_ast(tree, source)
     }
 
     /// Parse with an old tree for incremental parsing.
@@ -138,13 +237,7 @@ impl Parser {
         source: &str,
         old_tree: Option<&Tree>,
     ) -> Result<Rc<RefCell<Node>>> {
-        let tree = self
-            .ts_parser
-            .parse(source, old_tree)
-            .ok_or_else(|| Error::ParseError {
-                position: 0,
-                message: "Failed to parse document".to_string(),
-            })?;
+        let tree = self.parse_tree(source, old_tree)?;
         self.tree_to_ast(&tree, source)
     }
 
@@ -1783,5 +1876,80 @@ mod tests {
             Some("My Document"),
             "Root node should have doc-title property"
         );
+    }
+
+    // --- Incremental reparse ---------------------------------------------
+
+    #[test]
+    fn single_region_edit_insert() {
+        // "abXYc" from "abc": prefix "ab", suffix "c", region [2,2)->[2,4).
+        let e = single_region_edit("abc", "abXYc");
+        assert_eq!(e.start_byte, 2);
+        assert_eq!(e.old_end_byte, 2);
+        assert_eq!(e.new_end_byte, 4);
+    }
+
+    #[test]
+    fn single_region_edit_delete_and_replace() {
+        let del = single_region_edit("hello world", "hello");
+        assert_eq!((del.start_byte, del.old_end_byte, del.new_end_byte), (5, 11, 5));
+
+        let rep = single_region_edit("* Head\n", "* Title\n");
+        // Common prefix "* ", common suffix "\n"; middle differs.
+        assert_eq!(rep.start_byte, 2);
+        assert_eq!(&"* Head\n"[rep.start_byte..rep.old_end_byte], "Head");
+        assert_eq!(&"* Title\n"[rep.start_byte..rep.new_end_byte], "Title");
+    }
+
+    #[test]
+    fn single_region_edit_identical_is_empty() {
+        let e = single_region_edit("same", "same");
+        assert_eq!((e.start_byte, e.old_end_byte, e.new_end_byte), (4, 4, 4));
+    }
+
+    #[test]
+    fn point_at_tracks_rows_and_columns() {
+        let s = "ab\ncde\nf";
+        assert_eq!(point_at(s, 0), Point::new(0, 0));
+        assert_eq!(point_at(s, 2), Point::new(0, 2)); // end of first line
+        assert_eq!(point_at(s, 3), Point::new(1, 0)); // start of second line
+        assert_eq!(point_at(s, 5), Point::new(1, 2));
+        assert_eq!(point_at(s, 7), Point::new(2, 0));
+    }
+
+    #[test]
+    fn single_region_edit_respects_char_boundaries() {
+        // Multi-byte chars: inserting between "é" and "ü" must not split them.
+        let old = "é ü";
+        let new = "é X ü";
+        let e = single_region_edit(old, new);
+        assert!(old.is_char_boundary(e.start_byte));
+        assert!(old.is_char_boundary(e.old_end_byte));
+        assert!(new.is_char_boundary(e.new_end_byte));
+    }
+
+    /// An incremental reparse must produce the same tree as a full parse of the
+    /// new text — that's the whole correctness bar.
+    fn assert_incremental_matches_full(old: &str, new: &str) {
+        let mut p = Parser::new().unwrap();
+        let old_tree = p.parse_tree(old, None).unwrap();
+        let inc = p.parse_tree_edited(&old_tree, old, new).unwrap();
+        let full = p.parse_tree(new, None).unwrap();
+        assert_eq!(
+            inc.root_node().to_sexp(),
+            full.root_node().to_sexp(),
+            "incremental reparse diverged from full parse\n old={old:?}\n new={new:?}"
+        );
+    }
+
+    #[test]
+    fn incremental_matches_full_parse() {
+        assert_incremental_matches_full("* Head\ntext\n", "* Head\nmore text\n");
+        assert_incremental_matches_full("* Head\n", "* Head\n** Sub\n");
+        assert_incremental_matches_full("- a\n- b\n", "- a\n- b\n- c\n");
+        assert_incremental_matches_full("#+TITLE: x\n\nbody\n", "#+TITLE: y\n\nbody\n");
+        assert_incremental_matches_full("word\n", "word\n"); // no-op edit
+        assert_incremental_matches_full("full text here\n", "\n"); // mass delete
+        assert_incremental_matches_full("é ü\n", "é X ü\n"); // multibyte
     }
 }

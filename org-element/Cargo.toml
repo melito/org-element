@@ -14,6 +14,7 @@ build = "build.rs"
 # published package.
 include = [
     "src/**/*.rs",
+    "src/**/*.scm",
     "build.rs",
     "grammar/parser.c",
     "grammar/scanner.c",
