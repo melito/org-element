@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Native build + test. This is a blocking gate.
+  test:
+    name: test (native)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --all-features
+
+  # Formatting + clippy hygiene. Currently NON-BLOCKING (continue-on-error):
+  # the existing source predates a `cargo fmt` pass and has pervasive drift, so
+  # making these blocking now would fail every PR for reasons unrelated to the
+  # change under review. Once the crate has been run through `cargo fmt --all`
+  # and clippy once, delete the two `continue-on-error` lines to enforce them.
+  lint:
+    name: lint (non-blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+        continue-on-error: true
+      - run: cargo clippy --workspace --all-features -- -D warnings
+        continue-on-error: true
+
+  # Wasm LINK gate. This is the regression guard for the
+  # `duplicate symbol: __assert_fail` class of bug.
+  #
+  # Why a dedicated job and not just `cargo build --target wasm32...`:
+  # building the library alone yields an `.rlib` archive — no final link — so
+  # duplicate symbols across rlibs are never resolved and the bug stays hidden
+  # (this is exactly why `cargo check` passed while a real Leptos hydrate build
+  # failed). The `wasm-link-test` crate is a `cdylib`, which forces `rust-lld`
+  # to merge org-element's rlib with the tree-sitter runtime rlib and link a
+  # final wasm module — reproducing the consumer scenario. If a duplicate libc
+  # symbol is ever re-introduced, this job fails to link.
+  wasm-link:
+    name: wasm link gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+
+      # The tree-sitter-org C grammar must be compiled for wasm, which needs a
+      # clang that has the WebAssembly backend. Ubuntu's stock clang already
+      # includes it; pin it explicitly so the build never silently falls back
+      # to a compiler without a wasm target.
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y clang llvm
+
+      - name: Build wasm cdylib (forces a real link)
+        env:
+          CC_wasm32_unknown_unknown: clang
+          AR_wasm32_unknown_unknown: llvm-ar
+        run: cargo build -p wasm-link-test --target wasm32-unknown-unknown
+
+      # Belt-and-suspenders: even a successful link could in principle leave a
+      # surprise. Assert the known-bad symbol is defined exactly once in the
+      # final module. `llvm-nm` lists wasm defined symbols as `T`/`t`.
+      - name: Assert no duplicate __assert_fail
+        run: |
+          WASM=target/wasm32-unknown-unknown/debug/wasm_link_test.wasm
+          count=$(llvm-nm "$WASM" | grep -cE '__assert_fail' || true)
+          echo "__assert_fail occurrences in $WASM: $count"
+          if [ "$count" -gt 1 ]; then
+            echo "::error::__assert_fail defined more than once — duplicate-symbol regression"
+            exit 1
+          fi
